@@ -4,6 +4,9 @@
 #include <cmath>
 #include <numbers>
 #include <tinyxml2.h>
+#include <json/value.h>
+#include <json/writer.h>
+#include <json/reader.h>
 
 const uint32_t earthRadius = 6371000;  //in metres
 
@@ -34,14 +37,21 @@ Converter::~Converter()
 	m_Tag = nullptr;
 }
 
-void Converter::LoadFile(const char* name)
+void Converter::LoadJsonFile(const char* fileName, Json::Value& root)
 {
+	std::ifstream inputStream(fileName);
+	Json::Reader reader;
 
-	FILE* f_input;
+	bool success = reader.parse(inputStream, root);
 
-	//fopen_s(&f_input, "liechtenstein-latest.osm", "rb");
+	if (!success)
+	{
+		throw new std::exception("something went wrong!");
+	}
+}
 
-	//xDoc.LoadFile(f_input);
+void Converter::LoadOsmFile(const char* name)
+{
 	auto err = m_xDoc.LoadFile(name);
 
 	if (err != tinyxml2::XML_SUCCESS)
@@ -51,6 +61,26 @@ void Converter::LoadFile(const char* name)
 
 	m_Osm = m_xDoc.FirstChildElement("osm");
 
+}
+
+void Converter::GetPreprocessedData(const Json::Value& root)
+{
+	int num = 0;
+	for (auto it = root["nodes"].begin(); it != root["nodes"].end(); ++it) 
+	{
+		Json::Value node = it->get("node", Json::nullValue);
+		
+		if (node != Json::nullValue)
+		{
+			int64_t val = node["id"].asInt64();
+			float_t lat = node["lat"].asFloat();
+			float_t lon = node["lon"].asFloat();
+			
+			
+		}
+		
+	}
+	;
 }
 
 void Converter::SelectNodesNeeded()
@@ -204,7 +234,7 @@ void Converter::LoadHighways()
 	}
 }
 
-void Converter::SaveToJson()
+void Converter::SaveToJson(const char* fileName)
 {
 	Json::Value nodes(Json::arrayValue);
 
@@ -243,9 +273,27 @@ void Converter::SaveToJson()
 
 	std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
 	std::ofstream outputFileStream;
-	outputFileStream.open("highwaydata.json");
+	std::string je = "highwaydata.json";
+	outputFileStream.open(je);
 	writer->write(doc, &outputFileStream);
 	outputFileStream.close();
+}
+
+void Converter::ConvertOsmDataToJson(const char* osmFileName, const char* jsonFileName)
+{
+	LoadOsmFile(osmFileName);
+	SelectNodesNeeded();
+	LoadHighwayNodes();
+	LoadHighways();
+	SaveToJson(jsonFileName);
+}
+
+void Converter::ReadPreprocessedDataFromJson(const char* fileName)
+{
+	Json::Value root;
+	LoadJsonFile(fileName, root);
+	GetPreprocessedData(root);
+
 }
 
 float_t Converter::CalculateDistanceBetweenTwoLatLonsInMetres(const float_t lat1, const float_t lat2, const float_t lon1, const float_t lon2)

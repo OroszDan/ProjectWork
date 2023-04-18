@@ -20,7 +20,17 @@ public:
 
 	~Converter();
 
-	void LoadFile(const char* name);
+	void ConvertOsmDataToJson(const char* osmFileName, const char* jsonFileName);
+
+	void ReadPreprocessedDataFromJson(const char* fileName);
+
+private:
+
+	void LoadJsonFile(const char* fileName, Json::Value& root);
+
+	void LoadOsmFile(const char* fileName);
+
+	void GetPreprocessedData(const Json::Value& root);
 
 	void SelectNodesNeeded();
 
@@ -28,7 +38,7 @@ public:
 
 	void LoadHighways();
 
-	void SaveToJson();
+	void SaveToJson(const char* fileName);	
 
 private:
 

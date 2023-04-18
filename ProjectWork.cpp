@@ -38,10 +38,7 @@ int JsonCreate()
     writer->write(event, &outputFileStream);
     outputFileStream.close();
 
-    //std::cout << event << std::endl;
-
-
-    return 0;
+   return 0;
 }
 
 int main()
@@ -49,11 +46,8 @@ int main()
 
     Converter* converter = new Converter();
 
-    converter->LoadFile("liechtenstein-latest.osm");
-    converter->SelectNodesNeeded();
-    converter->LoadHighwayNodes();
-    converter->LoadHighways();
-    converter->SaveToJson();
+    converter->ReadPreprocessedDataFromJson("highwaydata.json");
+    //converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");
 
     converter->~Converter();
 
