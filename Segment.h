@@ -11,15 +11,15 @@ class Segment
 
 public:
 
-	Segment();
+	Segment(const int64_t id, const float_t length, const Junction* from, const Junction* to);
 
-	uint8_t m_Maxspeed;
+	const int64_t m_Id;
 
-	int32_t m_Length;
+	const float_t m_Length;
 
-	Junction* m_From;
+	const Junction* m_From;
 
-	Junction* m_To;
+	const Junction* m_To;
 
 };
 

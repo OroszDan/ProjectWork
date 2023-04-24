@@ -30,7 +30,7 @@ private:
 
 	void LoadOsmFile(const char* fileName);
 
-	void GetPreprocessedData(const Json::Value& root);
+	void GetPreprocessedData(const Json::Value& root, std::unordered_map<int64_t, Junction*>* Junctions, std::vector<Segment*>* Segments);
 
 	void SelectNodesNeeded();
 

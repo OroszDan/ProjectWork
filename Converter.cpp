@@ -46,7 +46,7 @@ void Converter::LoadJsonFile(const char* fileName, Json::Value& root)
 
 	if (!success)
 	{
-		throw new std::exception("something went wrong!");
+		throw new std::exception("Json file not loaded correctly");
 	}
 }
 
@@ -63,24 +63,54 @@ void Converter::LoadOsmFile(const char* name)
 
 }
 
-void Converter::GetPreprocessedData(const Json::Value& root)
-{
-	int num = 0;
+void Converter::GetPreprocessedData(const Json::Value& root, std::unordered_map<int64_t, Junction*>* Junctions, std::vector<Segment*>* Segments)
+{	
+	Junction* junction;
+
 	for (auto it = root["nodes"].begin(); it != root["nodes"].end(); ++it) 
 	{
 		Json::Value node = it->get("node", Json::nullValue);
 		
 		if (node != Json::nullValue)
 		{
-			int64_t val = node["id"].asInt64();
+			int64_t id = node["id"].asInt64();
 			float_t lat = node["lat"].asFloat();
 			float_t lon = node["lon"].asFloat();
 			
-			
-		}
-		
+			junction = new Junction(id, lon, lat);
+			Junctions->insert(std::make_pair(junction->m_Id, junction));
+		}	
 	}
-	;
+
+	Segment* segment;
+
+	for (auto it = root["ways"].begin(); it != root["ways"].end(); ++it)
+	{
+		Json::Value node = it->get("way", Json::nullValue);
+
+		if (node != Json::nullValue)
+		{
+			int64_t id = node["id"].asInt64();
+			int64_t idFrom = node["idfrom"].asInt64();
+			int64_t idTo = node["idto"].asInt64();
+			float_t length = node["length"].asFloat();
+			bool oneWay = node["oneway"].asBool();
+
+			segment = new Segment(id, length, Junctions->at(idFrom), Junctions->at(idTo));
+
+			if (oneWay)
+			{
+				Junctions->at(idFrom)->AddSegment(segment);
+			}
+			else
+			{
+				Junctions->at(idFrom)->AddSegment(segment);
+				Junctions->at(idTo)->AddSegment(segment);
+			}
+			
+			Segments->push_back(segment);
+		}
+	}
 }
 
 void Converter::SelectNodesNeeded()
@@ -290,9 +320,11 @@ void Converter::ConvertOsmDataToJson(const char* osmFileName, const char* jsonFi
 
 void Converter::ReadPreprocessedDataFromJson(const char* fileName)
 {
+	std::unordered_map<int64_t, Junction*>* Junctions = new std::unordered_map<int64_t, Junction*>();
+	std::vector<Segment*>* Segments = new std::vector<Segment*>();
 	Json::Value root;
 	LoadJsonFile(fileName, root);
-	GetPreprocessedData(root);
+	GetPreprocessedData(root, Junctions, Segments);
 
 }
 
@@ -338,11 +370,11 @@ bool Converter::IsRoad(const char* roadType)
 		strcmp(roadType, "tertiary") &&
 		strcmp(roadType, "unclassified") &&
 		strcmp(roadType, "residential") &&
-		strcmp(roadType, "unclassified")&&
-		strcmp(roadType, "motorway_link")&&
-		strcmp(roadType, "trunk_link")&&
-		strcmp(roadType, "primary_link")&&
-		strcmp(roadType, "secondary_link")&&
+		strcmp(roadType, "unclassified") &&
+		strcmp(roadType, "motorway_link") &&
+		strcmp(roadType, "trunk_link") &&
+		strcmp(roadType, "primary_link") &&
+		strcmp(roadType, "secondary_link") &&
 		strcmp(roadType, "tertiary_link"))
 	{
 		return false;
