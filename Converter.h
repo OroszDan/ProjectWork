@@ -22,7 +22,7 @@ public:
 
 	void ConvertOsmDataToJson(const char* osmFileName, const char* jsonFileName);
 
-	void ReadPreprocessedDataFromJson(const char* fileName);
+	void ReadPreprocessedDataFromJson(const char* fileName, std::shared_ptr<std::unordered_map<int64_t, Junction*>> junctions, std::shared_ptr<std::vector<Segment*>> segments);
 
 private:
 
@@ -30,7 +30,7 @@ private:
 
 	void LoadOsmFile(const char* fileName);
 
-	void GetPreprocessedData(const Json::Value& root, std::unordered_map<int64_t, Junction*>* Junctions, std::vector<Segment*>* Segments);
+	void GetPreprocessedData(const Json::Value& root, std::shared_ptr<std::unordered_map<int64_t, Junction*>> Junctions, std::shared_ptr<std::vector<Segment*>> Segments);
 
 	void SelectNodesNeeded();
 
@@ -42,21 +42,19 @@ private:
 
 private:
 
-	std::set<int64_t>* m_Node_Ids;
-	std::unordered_map<int64_t, Node*>* m_Nodes;
-	std::vector<Way*>* m_Ways;
-	std::vector<Node*>* m_Route_Node_Ids;
+	std::unique_ptr<std::unordered_map<int64_t, uint8_t>> m_Node_Ids;
+	std::unique_ptr<std::unordered_map<int64_t, Node>> m_Nodes;
+	std::unique_ptr<std::vector<Way>> m_Ways;
 
 	tinyxml2::XMLDocument m_xDoc;
 
 	tinyxml2::XMLElement* m_Osm; 
 	tinyxml2::XMLElement* m_Way;
 	tinyxml2::XMLElement* m_Nd;
-	tinyxml2::XMLElement* m_Tag;
 
 	float_t CalculateDistanceBetweenTwoLatLonsInMetres(const float_t lat1, const float_t lat2, const float_t lon1, const float_t lon2);
 
-	float_t CalculateLength(const std::vector<Node*>* nodeIds);
+	void CalculateAndSetLength(Way* way);
 
 	bool IsRoad(const char* roadType);
 };

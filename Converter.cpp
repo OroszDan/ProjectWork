@@ -12,29 +12,21 @@ const uint32_t earthRadius = 6371000;  //in metres
 
 Converter::Converter()
 {
-	m_Node_Ids = new std::set<int64_t>();
-	m_Nodes = new std::unordered_map<int64_t, Node*>();
-	m_Ways = new std::vector<Way*>();
-	m_Route_Node_Ids = new std::vector<Node*>();
+	//m_Node_Ids = new std::set<int64_t>();
+	/*m_Nodes = new std::unordered_map<int64_t, Node*>();*/
+	/*Ways = new std::vector<Way*>();*/
 
 	m_Osm = nullptr;
 	m_Way = nullptr;
 	m_Nd = nullptr;
-	m_Tag = nullptr;
 
 }
 
 Converter::~Converter()
 {
-	m_Node_Ids = nullptr;
-	m_Nodes = nullptr;
-	m_Ways = nullptr;
-	m_Route_Node_Ids = nullptr;
-
 	m_Osm = nullptr;
 	m_Way = nullptr;
 	m_Nd = nullptr;
-	m_Tag = nullptr;
 }
 
 void Converter::LoadJsonFile(const char* fileName, Json::Value& root)
@@ -46,7 +38,7 @@ void Converter::LoadJsonFile(const char* fileName, Json::Value& root)
 
 	if (!success)
 	{
-		throw new std::exception("Json file not loaded correctly");
+		throw std::exception("Json file not loaded correctly");
 	}
 }
 
@@ -56,17 +48,15 @@ void Converter::LoadOsmFile(const char* name)
 
 	if (err != tinyxml2::XML_SUCCESS)
 	{
-		throw new std::exception("Osm file not loaded correctly");
+		throw std::exception("Osm file not loaded correctly");
 	}
 
 	m_Osm = m_xDoc.FirstChildElement("osm");
 
 }
 
-void Converter::GetPreprocessedData(const Json::Value& root, std::unordered_map<int64_t, Junction*>* Junctions, std::vector<Segment*>* Segments)
+void Converter::GetPreprocessedData(const Json::Value& root, std::shared_ptr<std::unordered_map<int64_t, Junction*>> Junctions, std::shared_ptr<std::vector<Segment*>> Segments)
 {	
-	Junction* junction;
-
 	for (auto it = root["nodes"].begin(); it != root["nodes"].end(); ++it) 
 	{
 		Json::Value node = it->get("node", Json::nullValue);
@@ -77,12 +67,10 @@ void Converter::GetPreprocessedData(const Json::Value& root, std::unordered_map<
 			float_t lat = node["lat"].asFloat();
 			float_t lon = node["lon"].asFloat();
 			
-			junction = new Junction(id, lon, lat);
+			Junction* junction = new Junction(id, lon, lat);
 			Junctions->insert(std::make_pair(junction->m_Id, junction));
 		}	
 	}
-
-	Segment* segment;
 
 	for (auto it = root["ways"].begin(); it != root["ways"].end(); ++it)
 	{
@@ -95,8 +83,14 @@ void Converter::GetPreprocessedData(const Json::Value& root, std::unordered_map<
 			int64_t idTo = node["idto"].asInt64();
 			float_t length = node["length"].asFloat();
 			bool oneWay = node["oneway"].asBool();
+			uint8_t maxspeed = node["maxspeed"].asInt();
 
-			segment = new Segment(id, length, Junctions->at(idFrom), Junctions->at(idTo));
+			Segment* segment = new Segment(id, length, Junctions->at(idFrom), Junctions->at(idTo), maxspeed);
+
+			for (auto nodeIt = node["innernodes"].begin(); nodeIt != node["innernodes"].end(); nodeIt++)
+			{
+				segment->m_InnerNodes->push_back(Junctions->at(nodeIt->asInt64()));
+			}
 
 			if (oneWay)
 			{
@@ -115,35 +109,51 @@ void Converter::GetPreprocessedData(const Json::Value& root, std::unordered_map<
 
 void Converter::SelectNodesNeeded()
 {
-	m_Node_Ids = new std::set<int64_t>();
+	m_Node_Ids = std::make_unique<std::unordered_map<int64_t, uint8_t>>();
 
 	m_Way = m_Osm->FirstChildElement("way");
 
-	const tinyxml2::XMLAttribute* id;
-
 	while (m_Way != nullptr)
 	{
-		m_Tag = m_Way->FirstChildElement("tag");
-		auto Iid = m_Way->FindAttribute("id")->Int64Value();
+		const tinyxml2::XMLElement* tag = m_Way->FirstChildElement("tag");
 
-		while (m_Tag != nullptr && strcmp(m_Tag->FindAttribute("k")->Value(), "highway"))
+		while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "highway"))
 		{
-			m_Tag = m_Tag->NextSiblingElement("tag");
+			tag = tag->NextSiblingElement("tag");
 		}
 
-		if (m_Tag != nullptr)
+		if (tag != nullptr)
 		{
-			auto roadType = m_Tag->FindAttribute("v")->Value();
+			auto roadType = tag->FindAttribute("v")->Value();
 			if (IsRoad(roadType))
 			{
-
 				m_Nd = m_Way->FirstChildElement("nd");
+				int i = 0;
 				while (m_Nd != nullptr)
 				{
 					auto ref = m_Nd->FindAttribute("ref")->Int64Value();
 
-					m_Node_Ids->insert(ref);
+					auto it = m_Node_Ids->find(ref);
+
+					if ((i == 0) || (m_Nd->NextSiblingElement("nd") == nullptr)) //first or last node
+					{
+						if (it != m_Node_Ids->end())
+						{
+							it->second++;
+						}
+						else
+						{
+							m_Node_Ids->insert(std::make_pair(ref, (uint8_t)1));
+						}
+					}
+					else
+					{
+						m_Node_Ids->insert(std::make_pair(ref, (uint8_t)0));
+					}
+
 					m_Nd = m_Nd->NextSiblingElement("nd");
+
+					i++;
 				}
 
 			}
@@ -162,7 +172,7 @@ void Converter::LoadHighwayNodes()
 
 	tinyxml2::XMLElement* node;
 
-	m_Nodes = new std::unordered_map<int64_t, Node*>();
+	m_Nodes = std::make_unique<std::unordered_map<int64_t, Node>>();
 
 	node = m_Osm->FirstChildElement("node");
 
@@ -172,18 +182,17 @@ void Converter::LoadHighwayNodes()
 	{
 		id = node->FindAttribute("id");
 
-		if (std::find(m_Node_Ids->cbegin(), m_Node_Ids->cend(), id->Int64Value()) != m_Node_Ids->cend())
+		if (m_Node_Ids->find(id->Int64Value()) != m_Node_Ids->end())
 		{
 			lat = node->FindAttribute("lat");
 			lon = node->FindAttribute("lon");
 
-			Node* highway_node = new Node();
-			highway_node->m_Id = id->Int64Value();
-			highway_node->m_Lat = lat->float_tValue();
-			highway_node->m_Lon = lon->float_tValue();
+			Node highway_node = Node();
+			highway_node.m_Id = id->Int64Value();
+			highway_node.m_Lat = lat->float_tValue();
+			highway_node.m_Lon = lon->float_tValue();
 
-			m_Nodes->insert(std::make_pair(highway_node->m_Id, highway_node));
-
+			m_Nodes->insert(std::make_pair(highway_node.m_Id, highway_node));
 		}
 
 		node = node->NextSiblingElement("node");
@@ -192,7 +201,7 @@ void Converter::LoadHighwayNodes()
 
 void Converter::LoadHighways()
 {
-	m_Ways = new std::vector<Way*>();
+	m_Ways = std::make_unique<std::vector<Way>>();
 
 	const tinyxml2::XMLAttribute* id;
 
@@ -200,61 +209,103 @@ void Converter::LoadHighways()
 
 	while (m_Way != nullptr)
 	{
-		m_Tag = m_Way->FirstChildElement("tag");
+		const tinyxml2::XMLElement* startTag = m_Way->FirstChildElement("tag");
+		const tinyxml2::XMLElement* tag = startTag;
 		auto Iid = m_Way->FindAttribute("id")->Int64Value();
 
-		while (m_Tag != nullptr && strcmp(m_Tag->FindAttribute("k")->Value(), "highway"))
+		while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "highway"))
 		{
-			m_Tag = m_Tag->NextSiblingElement("tag");
+			tag = tag->NextSiblingElement("tag");
 		}
 
-		if (m_Tag != nullptr)
+		if (tag != nullptr)
 		{
-			m_Route_Node_Ids = new std::vector<Node*>();
 			id = m_Way->FindAttribute("id");
 			m_Nd = m_Way->FirstChildElement("nd");
-			auto roadType = m_Tag->FindAttribute("v")->Value();
+			auto roadType = tag->FindAttribute("v")->Value();
 
 			if (IsRoad(roadType))
 			{
-				Way* way_temp = new Way();
+				Way way_temp = Way();
 
-				way_temp->m_Id = m_Way->FindAttribute("id")->Int64Value();
+				way_temp.m_Id = m_Way->FindAttribute("id")->Int64Value();
 
-				while (m_Tag != nullptr && strcmp(m_Tag->FindAttribute("k")->Value(), "oneway"))
+				while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "oneway"))
 				{
-					m_Tag = m_Tag->NextSiblingElement("m_Tag");
+					tag = tag->NextSiblingElement("tag");
 				}
 
-				if (m_Tag != nullptr)
+				if (tag != nullptr)
 				{
-					if (strcmp(m_Tag->FindAttribute("v")->Value(), "yes"))
+					if (strcmp(tag->FindAttribute("v")->Value(), "yes"))
 					{
-						way_temp->m_OneWay = false;
+						way_temp.m_OneWay = false;
 					}
 					else
 					{
-						way_temp->m_OneWay = true;
+						way_temp.m_OneWay = true;
 					}
 				}
 				else
 				{
-					way_temp->m_OneWay = false;
+					way_temp.m_OneWay = false;
+				}
+
+				tag = startTag;
+
+				while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "maxspeed"))
+				{
+					tag = tag->NextSiblingElement("tag");
+				}
+
+				if (tag != nullptr)
+				{
+					way_temp.m_Maxspeed = tag->FindAttribute("v")->IntValue();
+				}
+				else
+				{
+					way_temp.m_Maxspeed = 50;
 				}
 
 				m_Nd = m_Way->FirstChildElement("nd");
+
+				int i = 0;
 				while (m_Nd != nullptr)
 				{
 					auto ref = m_Nd->FindAttribute("ref")->Int64Value();
 
-					m_Route_Node_Ids->push_back(m_Nodes->at(ref));
+					if (i == 0 || m_Nd->NextSiblingElement("nd") == nullptr)
+					{
+						way_temp.m_InnerNodes->push_back(ref);
+					}
+					else
+					{
+						auto numberOfRoadsCrossing = m_Node_Ids->at(ref);
+
+						if (numberOfRoadsCrossing > 0)
+						{
+							way_temp.m_InnerNodes->push_back(ref);
+
+							CalculateAndSetLength(&way_temp);
+
+							m_Ways->push_back(way_temp);
+
+							way_temp.m_InnerNodes = std::make_shared<std::vector<int64_t>>();
+
+							way_temp.m_InnerNodes->push_back(ref);
+							
+						}
+						else
+						{
+							way_temp.m_InnerNodes->push_back(ref);
+						}
+					}
+
 					m_Nd = m_Nd->NextSiblingElement("nd");
-				}
+					i++;
+				}		
 
-				way_temp->m_IdFrom = m_Route_Node_Ids->at(0)->m_Id;
-				way_temp->m_IdTo = m_Route_Node_Ids->at(m_Route_Node_Ids->size() - 1)->m_Id;
-
-				way_temp->m_Length = CalculateLength(m_Route_Node_Ids);
+				CalculateAndSetLength(&way_temp);
 
 				m_Ways->push_back(way_temp);
 			}
@@ -271,9 +322,9 @@ void Converter::SaveToJson(const char* fileName)
 	for (auto it = m_Nodes->cbegin(); it != m_Nodes->cend(); it++)
 	{
 		Json::Value node;
-		node["node"]["id"] = it->second->m_Id;
-		node["node"]["lat"] = it->second->m_Lat;
-		node["node"]["lon"] = it->second->m_Lon;
+		node["node"]["id"] = it->second.m_Id;
+		node["node"]["lat"] = it->second.m_Lat;
+		node["node"]["lon"] = it->second.m_Lon;
 
 		nodes.append(node);
 	}
@@ -283,11 +334,31 @@ void Converter::SaveToJson(const char* fileName)
 	for (auto it = m_Ways->begin(); it != m_Ways->cend(); it++)
 	{
 		Json::Value way;
-		way["way"]["id"] = (*it)->m_Id;
-		way["way"]["idfrom"] = (*it)->m_IdFrom;
-		way["way"]["idto"] = (*it)->m_IdTo;
-		way["way"]["length"] = (*it)->m_Length;
-		way["way"]["oneway"] = (*it)->m_OneWay;
+		way["way"]["id"] = it->m_Id;
+		way["way"]["length"] = it->m_Length;
+		way["way"]["oneway"] = it->m_OneWay;
+		way["way"]["maxspeed"] = it->m_Maxspeed;
+
+		Json::Value nodes(Json::arrayValue);
+
+		for (size_t i = 0; i < it->m_InnerNodes->size(); i++)
+		{
+			if (i == 0)
+			{
+				way["way"]["idfrom"] = it->m_InnerNodes->at(i);
+			}
+			else if (i == it->m_InnerNodes->size() - 1)
+			{
+				way["way"]["idto"] = it->m_InnerNodes->at(i);
+			}
+			else
+			{
+				nodes.append(it->m_InnerNodes->at(i));
+			}
+			
+		}
+
+		way["way"]["innernodes"] = nodes;
 
 		ways.append(way);
 	}
@@ -303,8 +374,8 @@ void Converter::SaveToJson(const char* fileName)
 
 	std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
 	std::ofstream outputFileStream;
-	std::string je = "highwaydata.json";
-	outputFileStream.open(je);
+
+	outputFileStream.open(fileName);
 	writer->write(doc, &outputFileStream);
 	outputFileStream.close();
 }
@@ -318,13 +389,12 @@ void Converter::ConvertOsmDataToJson(const char* osmFileName, const char* jsonFi
 	SaveToJson(jsonFileName);
 }
 
-void Converter::ReadPreprocessedDataFromJson(const char* fileName)
+void Converter::ReadPreprocessedDataFromJson(const char* fileName, std::shared_ptr<std::unordered_map<int64_t, Junction*>> junctions, std::shared_ptr<std::vector<Segment*>> segments)
 {
-	std::unordered_map<int64_t, Junction*>* Junctions = new std::unordered_map<int64_t, Junction*>();
-	std::vector<Segment*>* Segments = new std::vector<Segment*>();
 	Json::Value root;
 	LoadJsonFile(fileName, root);
-	GetPreprocessedData(root, Junctions, Segments);
+	GetPreprocessedData(root, junctions, segments);
+
 
 }
 
@@ -348,17 +418,17 @@ float_t Converter::CalculateDistanceBetweenTwoLatLonsInMetres(const float_t lat1
 	return d;
 }
 
-float_t Converter::CalculateLength(const std::vector<Node*>* nodeIds)
+void Converter::CalculateAndSetLength(Way* way)
 {
 	float_t length = 0;
-	for (size_t i = 1; i < nodeIds->size(); i++)
+	for (size_t i = 1; i < way->m_InnerNodes->size(); i++)
 	{
-		length += CalculateDistanceBetweenTwoLatLonsInMetres(
-				nodeIds->at(i - 1)->m_Lat, nodeIds->at(i)->m_Lat,
-				nodeIds->at(i - 1)->m_Lon, nodeIds->at(i)->m_Lon);
+			length += CalculateDistanceBetweenTwoLatLonsInMetres(
+			m_Nodes->at(way->m_InnerNodes->at(i - 1)).m_Lat, m_Nodes->at(way->m_InnerNodes->at(i)).m_Lat,
+			m_Nodes->at(way->m_InnerNodes->at(i - 1)).m_Lon, m_Nodes->at(way->m_InnerNodes->at(i)).m_Lon);
 	}
 
-	return length;
+	way->m_Length = length;
 }
 
 bool Converter::IsRoad(const char* roadType)
@@ -370,7 +440,6 @@ bool Converter::IsRoad(const char* roadType)
 		strcmp(roadType, "tertiary") &&
 		strcmp(roadType, "unclassified") &&
 		strcmp(roadType, "residential") &&
-		strcmp(roadType, "unclassified") &&
 		strcmp(roadType, "motorway_link") &&
 		strcmp(roadType, "trunk_link") &&
 		strcmp(roadType, "primary_link") &&

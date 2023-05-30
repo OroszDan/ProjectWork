@@ -5,21 +5,29 @@
 #include <cmath>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 class Segment
 {
 
 public:
 
-	Segment(const int64_t id, const float_t length, const Junction* from, const Junction* to);
+	Segment(const int64_t id, const float_t length, Junction* from, Junction* to, uint8_t maxSpeed);
+	~Segment();
 
-	const int64_t m_Id;
+	Junction* GetEndJunction(const Junction* startJunction);
 
-	const float_t m_Length;
+	int64_t m_Id;
 
-	const Junction* m_From;
+	float_t m_Length;
 
-	const Junction* m_To;
+	Junction* m_From;
+
+	Junction* m_To;
+
+	uint8_t m_MaxSpeed;
+
+	std::shared_ptr<std::vector<Junction*>> m_InnerNodes;
 
 };
 
@@ -34,5 +42,9 @@ struct Way
 	int64_t m_IdFrom;
 
 	int64_t m_IdTo;
+
+	uint8_t m_Maxspeed;
+
+	std::shared_ptr<std::vector<int64_t>> m_InnerNodes = std::make_shared<std::vector<int64_t>>();
 };
 

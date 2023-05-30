@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-class Segment;
+class Segment;  //forward declaration
 
 class Junction
 {
@@ -22,7 +22,9 @@ public:
 
 	float_t m_Lat;
 
-private:
+	Segment* m_ShortestRouteNeighbor;
+
+	float_t m_ShortestRouteInMetres;
 
 	std::vector<Segment*>* m_Segments;
 };

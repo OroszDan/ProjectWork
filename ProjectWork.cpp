@@ -1,55 +1,46 @@
 // ProjectWork.cpp : This file contains the 'main' function. Program execution begins and ends there.
 //
 
-#include "Converter.h"
-#include "Segment.h"
-#include "tinyxml2.h"
+#include "RoutePlanner.h"
 
-#include <set>
-#include <map>
-#include <vector>
-#include <unordered_map>
-#include <iostream>
-#include <fstream>
-#include <json/value.h>
-#include <json/writer.h>
-
-int JsonCreate() 
-{
-    Json::Value event;
-    Json::Value vec(Json::arrayValue);
-    vec.append(Json::Value(1));
-    vec.append(Json::Value(2));
-    vec.append(Json::Value(3));
-
-    event["competitors"]["home"]["name"] = "Liverpool";
-    event["competitors"]["home"]["code"] = 89223;
-    event["competitors"]["away"]["name"] = "Aston Villa";
-    event["competitors"]["away"]["code"] = vec;
-
-    Json::StreamWriterBuilder builder;
-
-    builder["commentStyle"] = "None";
-    builder["indentation"] = "   ";
-
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    std::ofstream outputFileStream;
-    outputFileStream.open("test.json");
-    writer->write(event, &outputFileStream);
-    outputFileStream.close();
-
-   return 0;
-}
+//int JsonCreate() 
+//{
+//    Json::Value event;
+//    Json::Value vec(Json::arrayValue);
+//    vec.append(Json::Value(1));
+//    vec.append(Json::Value(2));
+//    vec.append(Json::Value(3));
+//
+//    event["competitors"]["home"]["name"] = "Liverpool";
+//    event["competitors"]["home"]["code"] = 89223;
+//    event["competitors"]["away"]["name"] = "Aston Villa";
+//    event["competitors"]["away"]["code"] = vec;
+//
+//    Json::StreamWriterBuilder builder;
+//
+//    builder["commentStyle"] = "None";
+//    builder["indentation"] = "   ";
+//
+//    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+//    std::ofstream outputFileStream;
+//    outputFileStream.open("test.json");
+//    writer->write(event, &outputFileStream);
+//    outputFileStream.close();
+//
+//   return 0;
+//}
 
 int main()
 {
+    /*Converter* converter = new Converter();
 
-    Converter* converter = new Converter();
+    converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");*/
 
-    converter->ReadPreprocessedDataFromJson("highwaydata.json");
-    //converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");
+    RoutePlanner* planner = new RoutePlanner();
 
-    converter->~Converter();
+    planner->Initialize();
+    planner->Search(346146156, 32020993)
+    ;
 
 }
 
