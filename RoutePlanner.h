@@ -9,7 +9,8 @@ public:
 	RoutePlanner();
 	void Initialize();
 	void Search(const int64_t from, const int64_t to);
-	Junction* GetMin(std::unordered_map<int64_t, int64_t>* s, std::vector<Junction*>* LE);
+	Junction* GetMin(std::shared_ptr<std::unordered_map<int64_t, int64_t>> S, std::shared_ptr<std::unordered_map<int64_t, Junction*>> LE);
+
 
 private:
 

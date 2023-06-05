@@ -32,14 +32,16 @@
 
 int main()
 {
-    /*Converter* converter = new Converter();
+    //Converter* converter = new Converter();
 
-    converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");*/
+    ////converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");
+    //converter->ConvertOsmDataToJson("luxembourg-latest.osm", "highwaydata.json");
 
     RoutePlanner* planner = new RoutePlanner();
 
     planner->Initialize();
-    planner->Search(346146156, 32020993)
+    //planner->Search(346146156, 32020993);
+    planner->Search(346146156, 30604007);
     ;
 
 }
