@@ -52,10 +52,7 @@ private:
 	tinyxml2::XMLElement* m_Way;
 	tinyxml2::XMLElement* m_Nd;
 
-	float_t CalculateDistanceBetweenTwoLatLonsInMetres(const float_t lat1, const float_t lat2, const float_t lon1, const float_t lon2);
-
 	void CalculateAndSetLength(Way* way);
-
-	bool IsRoad(const char* roadType);
+	bool IsRoad(const char* roadType, const tinyxml2::XMLElement* tag);
 };
 

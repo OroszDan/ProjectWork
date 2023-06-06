@@ -26,6 +26,8 @@ public:
 
 	float_t m_ShortestRouteInMetres;
 
+	float_t m_ShortestRouteInMetresHeuristic;
+
 	std::vector<Segment*>* m_Segments;
 };
 

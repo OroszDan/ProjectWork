@@ -7,8 +7,7 @@
 #include <json/value.h>
 #include <json/writer.h>
 #include <json/reader.h>
-
-const uint32_t earthRadius = 6371000;  //in metres
+#include "Util.h"
 
 Converter::Converter()
 {
@@ -115,7 +114,8 @@ void Converter::SelectNodesNeeded()
 
 	while (m_Way != nullptr)
 	{
-		const tinyxml2::XMLElement* tag = m_Way->FirstChildElement("tag");
+		const tinyxml2::XMLElement* startTag = m_Way->FirstChildElement("tag");
+		const tinyxml2::XMLElement* tag = startTag;
 
 		while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "highway"))
 		{
@@ -125,7 +125,7 @@ void Converter::SelectNodesNeeded()
 		if (tag != nullptr)
 		{
 			auto roadType = tag->FindAttribute("v")->Value();
-			if (IsRoad(roadType))
+			if (IsRoad(roadType, startTag))
 			{
 				m_Nd = m_Way->FirstChildElement("nd");
 				int i = 0;
@@ -224,11 +224,13 @@ void Converter::LoadHighways()
 			m_Nd = m_Way->FirstChildElement("nd");
 			auto roadType = tag->FindAttribute("v")->Value();
 
-			if (IsRoad(roadType))
+			if (IsRoad(roadType, startTag))
 			{
 				Way way_temp = Way();
 
 				way_temp.m_Id = m_Way->FindAttribute("id")->Int64Value();
+
+				tag = startTag;
 
 				while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "oneway"))
 				{
@@ -398,32 +400,12 @@ void Converter::ReadPreprocessedDataFromJson(const char* fileName, std::shared_p
 
 }
 
-float_t Converter::CalculateDistanceBetweenTwoLatLonsInMetres(const float_t lat1, const float_t lat2, const float_t lon1, const float_t lon2)
-{
-
-	const float_t radLat1 = lat1 * std::numbers::pi / 180;
-	const float_t radLat2 = lat2 * std::numbers::pi / 180;
-
-	const float_t dLat = (lat2 - lat1) * std::numbers::pi / 180;
-	const float_t dLon = (lon2 - lon1) * std::numbers::pi / 180;
-
-	const float_t a = std::sinf(dLat / 2) * std::sinf(dLat / 2) +
-					std::cosf(radLat1) * std::cosf(radLat2) *
-					std::sinf(dLon / 2) * std::sinf(dLon / 2);
-
-	const float_t c = 2 * std::atan2f(std::sqrtf(a), std::sqrtf(1 - a));
-
-	const float_t d = earthRadius * c;
-
-	return d;
-}
-
 void Converter::CalculateAndSetLength(Way* way)
 {
 	float_t length = 0;
 	for (size_t i = 1; i < way->m_InnerNodes->size(); i++)
 	{
-			length += CalculateDistanceBetweenTwoLatLonsInMetres(
+			length += Util::CalculateDistanceBetweenTwoLatLonsInMetres(
 			m_Nodes->at(way->m_InnerNodes->at(i - 1)).m_Lat, m_Nodes->at(way->m_InnerNodes->at(i)).m_Lat,
 			m_Nodes->at(way->m_InnerNodes->at(i - 1)).m_Lon, m_Nodes->at(way->m_InnerNodes->at(i)).m_Lon);
 	}
@@ -431,7 +413,7 @@ void Converter::CalculateAndSetLength(Way* way)
 	way->m_Length = length;
 }
 
-bool Converter::IsRoad(const char* roadType)
+bool Converter::IsRoad(const char* roadType, const tinyxml2::XMLElement* tag)
 {
 	if (strcmp(roadType, "motorway") &&
 		strcmp(roadType, "trunk") && 
@@ -447,6 +429,21 @@ bool Converter::IsRoad(const char* roadType)
 		strcmp(roadType, "tertiary_link"))
 	{
 		return false;
+	}
+	else if (!strcmp(roadType, "service"))
+	{
+		while (tag != nullptr && strcmp(tag->FindAttribute("k")->Value(), "access"))
+		{
+			tag = tag->NextSiblingElement("tag");
+		}
+
+		if (tag != nullptr && 
+			(!strcmp(tag->FindAttribute("v")->Value(), "private") || 
+			 !strcmp(tag->FindAttribute("v")->Value(), "no")))
+		{
+			//access is restricted
+			return false;
+		}
 	}
 	else
 	{

@@ -1,4 +1,5 @@
 #include "RoutePlanner.h"
+#include "Util.h"
 
 RoutePlanner::RoutePlanner()
 {
@@ -21,6 +22,7 @@ void RoutePlanner::Search(const int64_t idFrom, const int64_t idTo)
     //Dijkstra algorithm
 
     std::shared_ptr<std::unordered_map<int64_t, int64_t>> S = std::make_shared<std::unordered_map<int64_t, int64_t>>();
+    std::shared_ptr<std::unordered_map<int64_t, Junction*>> LE = std::make_shared<std::unordered_map<int64_t, Junction*>>();
     bool routeFound = false;
 
     for (auto it = m_Junctions->cbegin(); it != m_Junctions->cend(); ++it) 
@@ -28,11 +30,11 @@ void RoutePlanner::Search(const int64_t idFrom, const int64_t idTo)
         S->insert(std::make_pair(it->first, it->first));
     }
 
-    std::shared_ptr<std::unordered_map<int64_t, Junction*>> LE = std::make_shared<std::unordered_map<int64_t, Junction*>>();
     //start
     Junction* start = m_Junctions->at(idFrom);
+    const Junction* target = m_Junctions->at(idTo);
     start->m_ShortestRouteInMetres = 0;
-   // LE->insert(start);
+ 
     LE->insert(std::make_pair(start->m_Id, start));
 
     while (S->size() > 0 && !routeFound)
@@ -53,6 +55,7 @@ void RoutePlanner::Search(const int64_t idFrom, const int64_t idTo)
 
             if (S->contains(endJunction->m_Id) && !LE->contains(endJunction->m_Id))
             {
+                endJunction->m_ShortestRouteInMetresHeuristic = GetHeuristicDistance(endJunction, target);
                 LE->insert(std::make_pair(endJunction->m_Id,endJunction));
             }
 
@@ -61,6 +64,23 @@ void RoutePlanner::Search(const int64_t idFrom, const int64_t idTo)
                 routeFound = true;
             }
         }
+    }
+
+    if (S->size() > 0)
+    {
+        //collect result
+        std::shared_ptr<std::vector<Segment*>> resultSegments = std::make_shared<std::vector<Segment*>>();
+
+        const Junction* currentJunction = target;
+        Segment* currentSegment = nullptr;
+
+        while (currentJunction != start)
+        {
+            currentSegment = currentJunction->m_ShortestRouteNeighbor;
+            resultSegments->push_back(currentSegment);     
+            currentJunction = currentSegment->GetEndJunction(currentJunction);
+        }
+    
     }
 
     ;
@@ -72,9 +92,10 @@ Junction* RoutePlanner::GetMin(std::shared_ptr<std::unordered_map<int64_t, int64
     //megoldás lehet esetleg
     //converter is szar mert vannak benne node-ok amelyek nem kellenek
     auto minIt = 
-    std::min_element(LE->begin(), LE->end(), [S](const std::pair<int64_t, Junction*> elem1, const std::pair<int64_t, Junction*> elem2)
+    std::min_element(LE->begin(), LE->end(), [](const std::pair<int64_t, Junction*> elem1, const std::pair<int64_t, Junction*> elem2)
     {
-        return elem1.second->m_ShortestRouteInMetres < elem2.second->m_ShortestRouteInMetres; 
+        return elem1.second->m_ShortestRouteInMetres + elem1.second->m_ShortestRouteInMetresHeuristic 
+             < elem2.second->m_ShortestRouteInMetres + elem2.second->m_ShortestRouteInMetresHeuristic; 
     });
 
     Junction* minElem = (*minIt).second;
@@ -83,4 +104,12 @@ Junction* RoutePlanner::GetMin(std::shared_ptr<std::unordered_map<int64_t, int64
     LE->erase(minIt);
 
     return minElem;
+}
+
+float_t RoutePlanner::GetHeuristicDistance(const Junction* start, const Junction* target)
+{
+    float_t distance = 
+        Util::CalculateDistanceBetweenTwoLatLonsInMetres(start->m_Lat, target->m_Lat, start->m_Lon, target->m_Lon);
+
+    return distance;
 }

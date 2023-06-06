@@ -10,7 +10,7 @@ public:
 	void Initialize();
 	void Search(const int64_t from, const int64_t to);
 	Junction* GetMin(std::shared_ptr<std::unordered_map<int64_t, int64_t>> S, std::shared_ptr<std::unordered_map<int64_t, Junction*>> LE);
-
+	float_t GetHeuristicDistance(const Junction* start, const Junction* target);
 
 private:
 
