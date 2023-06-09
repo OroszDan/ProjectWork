@@ -91,6 +91,8 @@ void Converter::GetPreprocessedData(const Json::Value& root, std::shared_ptr<std
 				segment->m_InnerNodes->push_back(Junctions->at(nodeIt->asInt64()));
 			}
 
+			
+
 			if (oneWay)
 			{
 				Junctions->at(idFrom)->AddSegment(segment);
@@ -102,6 +104,7 @@ void Converter::GetPreprocessedData(const Json::Value& root, std::shared_ptr<std
 			}
 			
 			Segments->push_back(segment);
+			
 		}
 	}
 }
@@ -400,6 +403,50 @@ void Converter::ReadPreprocessedDataFromJson(const char* fileName, std::shared_p
 
 }
 
+void Converter::SaveResultToGeoJson(std::shared_ptr<std::vector<const Junction*>> resultJunctions, const char* fileName)
+{
+	Json::Value root;
+
+	Json::Value feature;
+
+	feature["type"] = "Feature";
+	feature["properties"] = Json::nullValue;
+
+	Json::Value coordinateArray(Json::arrayValue);
+
+	for (auto it = resultJunctions->rbegin(); it != resultJunctions->rend(); ++it)
+	{
+		Json::Value coordinate(Json::arrayValue);
+
+		coordinate.append((*it)->m_Lat);
+		coordinate.append((*it)->m_Lon);
+
+		coordinateArray.append(coordinate);
+	}
+
+	feature["geometry"]["coordinates"] = coordinateArray;
+	feature["geometry"]["type"] = "LineString";
+
+	Json::Value featureArray(Json::arrayValue);
+	featureArray.append(feature);
+
+	root["type"] = "FeatureCollection";
+	root["features"] = featureArray;
+
+
+	Json::StreamWriterBuilder builder;
+
+	builder["commentStyle"] = "None";
+	builder["indentation"] = "   ";
+
+	std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+	std::ofstream outputFileStream;
+
+	outputFileStream.open(fileName);
+	writer->write(root, &outputFileStream);
+	outputFileStream.close();
+}
+
 void Converter::CalculateAndSetLength(Way* way)
 {
 	float_t length = 0;
@@ -443,6 +490,10 @@ bool Converter::IsRoad(const char* roadType, const tinyxml2::XMLElement* tag)
 		{
 			//access is restricted
 			return false;
+		}
+		else
+		{
+			return true;
 		}
 	}
 	else

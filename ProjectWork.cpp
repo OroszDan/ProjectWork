@@ -32,16 +32,40 @@
 
 int main()
 {
-    //Converter* converter = new Converter();
+    /*std::shared_ptr<std::vector<Junction>> resultJunctions = std::make_shared<std::vector<Junction>>();
+
+    Junction junction = Junction(2342, 3232, 232);
+
+    resultJunctions->push_back(junction);
+
+    auto je = &resultJunctions->back();
+
+    std::cout << je << std::endl;
+
+    auto jeboi = &resultJunctions->back();
+
+    std::cout << jeboi << std::endl;*/
+
+
+    //std::unique_ptr<Converter> converter = std::make_unique<Converter>();
 
     ////converter->ConvertOsmDataToJson("liechtenstein-latest.osm", "highwaydata.json");
     //converter->ConvertOsmDataToJson("luxembourg-latest.osm", "highwaydata.json");
 
-    RoutePlanner* planner = new RoutePlanner();
+
+
+
+
+    std::unique_ptr<RoutePlanner> planner = std::make_unique<RoutePlanner>();
+
+    std::shared_ptr<std::vector<const Junction*>> resultJunctions = std::make_shared<std::vector<const Junction*>>();
 
     planner->Initialize();
     //planner->Search(346146156, 32020993);
-    planner->Search(346146156, 30604007);
+    //planner->Search(346146156, 30604007, resultJunctions);
+    planner->Search((float)47.243446350097656f, (float)9.5248165130615234f, (float)47.244438171386719f, (float)9.5273571014404297f, resultJunctions);
+
+    Converter::SaveResultToGeoJson(resultJunctions, "result.geojson");
     ;
 
 }

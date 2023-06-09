@@ -24,6 +24,8 @@ public:
 
 	void ReadPreprocessedDataFromJson(const char* fileName, std::shared_ptr<std::unordered_map<int64_t, Junction*>> junctions, std::shared_ptr<std::vector<Segment*>> segments);
 
+	static void SaveResultToGeoJson(std::shared_ptr<std::vector<const Junction*>> resultJunctions, const char* filename);
+
 private:
 
 	void LoadJsonFile(const char* fileName, Json::Value& root);
