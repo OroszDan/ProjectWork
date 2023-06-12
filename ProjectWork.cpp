@@ -61,11 +61,13 @@ int main()
     std::shared_ptr<std::vector<const Junction*>> resultJunctions = std::make_shared<std::vector<const Junction*>>();
 
     planner->Initialize();
-    //planner->Search(346146156, 32020993);
-    //planner->Search(346146156, 30604007, resultJunctions);
-    planner->Search((float)47.243446350097656f, (float)9.5248165130615234f, (float)47.244438171386719f, (float)9.5273571014404297f, resultJunctions);
+    //planner->FindFastestRoute(346146156, 32020993);
+    //planner->FindFastestRoute(346146156, 30604007, resultJunctions);
+    //planner->FindFastestRoute((float)47.243446350097656f, (float)9.5248165130615234f, (float)47.244438171386719f, (float)9.5273571014404297f, resultJunctions);
+    //planner->FindFastestRoute(47.06570898583726, 9.496391087218626, 47.2435417175293, 9.524989128112793, resultJunctions);
+    planner->FindFastestRoute(47.2435417175293, 9.524989128112793, 47.23929180243033, 9.536333395646295, resultJunctions);
 
-    Converter::SaveResultToGeoJson(resultJunctions, "result.geojson");
+    Converter::SaveResultToGeoJson(resultJunctions, "../ProjectWorkClient/wwwroot/results/result.json");
     ;
 
 }

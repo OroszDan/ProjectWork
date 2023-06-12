@@ -22,11 +22,11 @@ public:
 
 	float_t m_Lat;
 
-	Segment* m_ShortestRouteNeighbor;
+	Segment* m_FastestRouteNeighbor;
 
-	float_t m_ShortestRouteInMetres;
+	float_t m_FastestRouteInMinutes;
 
-	float_t m_ShortestRouteInMetresHeuristic;
+	float_t m_FastestRouteInMinutesHeuristic;
 
 	std::vector<Segment*>* m_Segments;
 };

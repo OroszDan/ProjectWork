@@ -16,7 +16,7 @@ void RoutePlanner::Initialize()
 
 }
 
-void RoutePlanner::Search(const float_t startLat, const float_t startLon, const float_t targetLat, const float_t targetLon, std::shared_ptr<std::vector<const Junction*>> resultJunctions)
+void RoutePlanner::FindFastestRoute(const float_t startLat, const float_t startLon, const float_t targetLat, const float_t targetLon, std::shared_ptr<std::vector<const Junction*>> resultJunctions)
 {
     //Dijkstra algorithm
 
@@ -58,7 +58,7 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
         targetSegment = FindContainingSegment(target);
     }
 
-    start->m_ShortestRouteInMetres = 0;
+    start->m_FastestRouteInMinutes = 0;
 
     /*if (startSegment)
     {
@@ -87,15 +87,16 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
             endJunction = (*it)->GetEndJunction(u);
             //insert neighbor 
 
-            if (u->m_ShortestRouteInMetres + (*it)->m_Length < endJunction->m_ShortestRouteInMetres)
+            if (u->m_FastestRouteInMinutes + GetTravelTimeInMinutes((*it)->m_Length, (*it)->m_MaxSpeed) < endJunction->m_FastestRouteInMinutes)
             {
-                endJunction->m_ShortestRouteInMetres = u->m_ShortestRouteInMetres + (*it)->m_Length;
-                endJunction->m_ShortestRouteNeighbor = *it;   
+                endJunction->m_FastestRouteInMinutes = 
+                    u->m_FastestRouteInMinutes + GetTravelTimeInMinutes((*it)->m_Length, (*it)->m_MaxSpeed);
+                endJunction->m_FastestRouteNeighbor = *it;   
             }
 
             if (S->contains(endJunction->m_Id) && !LE->contains(endJunction->m_Id))
             {
-                endJunction->m_ShortestRouteInMetresHeuristic = GetHeuristicDistance(endJunction, target);
+                endJunction->m_FastestRouteInMinutesHeuristic = GetHeuristicTravelTime(endJunction, target);
                 LE->insert(std::make_pair(endJunction->m_Id,endJunction));
             }
 
@@ -117,7 +118,7 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
         {
             auto targetIt = std::find(targetSegment->m_InnerNodes->begin(), 
                                                         targetSegment->m_InnerNodes->end(), target);
-            ptrdiff_t startIndex = targetIt - targetSegment->m_InnerNodes->begin() + 1;
+            ptrdiff_t startIndex = targetIt - targetSegment->m_InnerNodes->begin();
             /*if (u == targetSegment->m_From)
             {
                 for (size_t i = index; i >= 0; i--)
@@ -133,7 +134,7 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
                 }
             }*/
 
-            SaveInnerJunctionsEdge(u, targetSegment, resultJunctions, startIndex);
+            SaveInnerJunctionsAtRoadEnds(u, targetSegment, resultJunctions, startIndex);
 
             currentJunction = u;
         }
@@ -146,8 +147,13 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
 
         while (currentJunction != start)
         {
+            if (startSegment && currentJunction == startSegment->m_To)
+            {
+                break;
+            }
+
             resultJunctions->push_back(currentJunction);
-            currentSegment = currentJunction->m_ShortestRouteNeighbor;
+            currentSegment = currentJunction->m_FastestRouteNeighbor;
 
             if (currentJunction == currentSegment->m_From)
             {
@@ -171,18 +177,33 @@ void RoutePlanner::Search(const float_t startLat, const float_t startLon, const 
         }
 
         if (startSegment)
-        {
+        {/*
             if (resultJunctions->back() != startSegment->m_From && resultJunctions->back() != startSegment->m_To)
-            {
+            {*/
                 resultJunctions->push_back(currentJunction);
-            }
+            //}
 
             auto startIt = std::find(startSegment->m_InnerNodes->begin(),
                 startSegment->m_InnerNodes->end(), innerStart);
-            ptrdiff_t startIndex = startIt - startSegment->m_InnerNodes->begin() + 1;
+            ptrdiff_t index = startIt - startSegment->m_InnerNodes->begin();
 
-            SaveInnerJunctionsEdge(resultJunctions->back(), startSegment, resultJunctions, startIndex);
-            //SaveInnerJunctions(resultJunctions->back(), startSegment, resultJunctions);
+            //SaveInnerJunctionsAtRoadEnds(resultJunctions->back(), startSegment, resultJunctions, index);
+
+            if (resultJunctions->back() == startSegment->m_From)
+            {
+                for (size_t i = 0; i < index; i++)
+                {
+                    resultJunctions->push_back(startSegment->m_InnerNodes->at(i));
+                }
+            }
+            else
+            {
+                for (size_t i = index; i < startSegment->m_InnerNodes->size(); ++i)
+                {
+                    resultJunctions->push_back(startSegment->m_InnerNodes->at(i));
+                }
+
+            }
         }
         else
         {
@@ -230,8 +251,8 @@ Junction* RoutePlanner::GetMin(std::shared_ptr<std::unordered_map<int64_t, int64
     auto minIt = 
     std::min_element(LE->begin(), LE->end(), [](const std::pair<int64_t, Junction*> elem1, const std::pair<int64_t, Junction*> elem2)
     {
-        return elem1.second->m_ShortestRouteInMetres + elem1.second->m_ShortestRouteInMetresHeuristic 
-             < elem2.second->m_ShortestRouteInMetres + elem2.second->m_ShortestRouteInMetresHeuristic; 
+        return elem1.second->m_FastestRouteInMinutes + elem1.second->m_FastestRouteInMinutesHeuristic 
+             < elem2.second->m_FastestRouteInMinutes + elem2.second->m_FastestRouteInMinutesHeuristic; 
     });
 
     Junction* minElem = (*minIt).second;
@@ -242,12 +263,18 @@ Junction* RoutePlanner::GetMin(std::shared_ptr<std::unordered_map<int64_t, int64
     return minElem;
 }
 
-float_t RoutePlanner::GetHeuristicDistance(const Junction* start, const Junction* target)
+float_t RoutePlanner::GetHeuristicTravelTime(const Junction* start, const Junction* target)
 {
-    float_t distance = 
-        Util::CalculateDistanceBetweenTwoLatLonsInMetres(start->m_Lat, target->m_Lat, start->m_Lon, target->m_Lon);
+    float_t distance = Util::CalculateDistanceBetweenTwoLatLonsInMetres(start->m_Lat, target->m_Lat,
+                                                                        start->m_Lon, target->m_Lon);
+    float_t travelTime = GetTravelTimeInMinutes(distance, 50);
 
-    return distance;
+    return travelTime;
+}
+
+float_t RoutePlanner::GetTravelTimeInMinutes(float_t distance, uint8_t maxSpeed)
+{
+    return distance / 1000 / maxSpeed * 60;
 }
 
 void RoutePlanner::SaveInnerJunctions(const Junction* referenceJunction, const Segment* segment, std::shared_ptr<std::vector<const Junction*>> junctions)
@@ -291,7 +318,7 @@ void RoutePlanner::GetStartAndTargetJunction(const float_t startLat, const float
     targetJunction = (*targetMinIt).second;
 }
 
-void RoutePlanner::SaveInnerJunctionsEdge(const Junction* referenceJunction, const Segment* segment, std::shared_ptr<std::vector<const Junction*>> junctions, const ptrdiff_t startIndex)
+void RoutePlanner::SaveInnerJunctionsAtRoadEnds(const Junction* referenceJunction, const Segment* segment, std::shared_ptr<std::vector<const Junction*>> junctions, const ptrdiff_t startIndex)
 {
     if (referenceJunction == segment->m_From)
     {

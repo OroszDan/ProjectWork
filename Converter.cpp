@@ -418,8 +418,8 @@ void Converter::SaveResultToGeoJson(std::shared_ptr<std::vector<const Junction*>
 	{
 		Json::Value coordinate(Json::arrayValue);
 
-		coordinate.append((*it)->m_Lat);
 		coordinate.append((*it)->m_Lon);
+		coordinate.append((*it)->m_Lat);
 
 		coordinateArray.append(coordinate);
 	}
